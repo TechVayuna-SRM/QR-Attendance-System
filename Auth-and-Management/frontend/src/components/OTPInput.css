@@ -1,0 +1,50 @@
+/* OTPInput styles */
+.otp-container {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.otp-digit {
+  width: 52px;
+  height: 60px;
+  border-radius: var(--r-lg);
+  border: 2px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-align: center;
+  outline: none;
+  transition: var(--transition);
+  caret-color: var(--primary-light);
+}
+
+.otp-digit:focus {
+  border-color: var(--border-focus);
+  background: var(--bg-input-focus);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2), 0 0 16px rgba(139, 92, 246, 0.3);
+  transform: translateY(-2px);
+}
+
+.otp-digit.filled {
+  border-color: var(--border-primary);
+  background: var(--primary-subtle);
+  color: var(--primary-light);
+}
+
+.otp-digit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.otp-error .otp-digit {
+  border-color: var(--error) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+@media (max-width: 400px) {
+  .otp-digit { width: 42px; height: 52px; font-size: 1.3rem; }
+  .otp-container { gap: 6px; }
+}
