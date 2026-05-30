@@ -7,6 +7,7 @@ import pandas as pd
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib import colors
+from attendance.utils import close_expired_sessions_and_mark_absent
 
 analytics_bp = Blueprint("analytics", __name__)
 
@@ -96,6 +97,7 @@ def get_domains():
 @analytics_bp.route("/summary", methods=["GET"])
 @login_required
 def summary():
+    close_expired_sessions_and_mark_absent()
     role = request.role
     args = request.args
     where, params = _get_scope(role, request.user_id, args)
@@ -109,21 +111,43 @@ def summary():
         })
 
     rows = _fetch_attendance(where, params)
-    total = len(rows)
-    present = sum(1 for r in rows if r["status"] == "present")
+    
+    # Collapse multiple domain attendance records for the same user on the same date
+    collapsed = {}
+    for r in rows:
+        key = (r["email"], r["date"])
+        if key not in collapsed:
+            collapsed[key] = {
+                "name": r["name"],
+                "email": r["email"],
+                "role": r["role"],
+                "date": r["date"],
+                "status": r["status"],
+                "marked_at": r["marked_at"],
+                "all_domains": [r["domain"]]
+            }
+        else:
+            collapsed[key]["all_domains"].append(r["domain"])
+            if r["status"] == "present":
+                collapsed[key]["status"] = "present"
+                collapsed[key]["marked_at"] = r["marked_at"] or collapsed[key]["marked_at"]
+
+    collapsed_rows = list(collapsed.values())
+    total = len(collapsed_rows)
+    present = sum(1 for r in collapsed_rows if r["status"] == "present")
     absent = total - present
     pct = round((present / total * 100), 2) if total else 0
 
     # Domain-wise breakdown
     domain_stats = {}
-    for r in rows:
-        d = r["domain"]
-        domain_stats.setdefault(d, {"present": 0, "absent": 0})
-        domain_stats[d][r["status"]] += 1
+    for r in collapsed_rows:
+        for d in r["all_domains"]:
+            domain_stats.setdefault(d, {"present": 0, "absent": 0})
+            domain_stats[d][r["status"]] += 1
 
     # Date-wise trend
     date_trend = {}
-    for r in rows:
+    for r in collapsed_rows:
         dt = str(r["date"])
         date_trend.setdefault(dt, {"present": 0, "absent": 0})
         date_trend[dt][r["status"]] += 1
@@ -131,7 +155,7 @@ def summary():
     # Member-wise breakdown (for admin, faculty and domain_lead)
     member_stats = {}
     if role in ("admin", "domain_lead", "faculty"):
-        for r in rows:
+        for r in collapsed_rows:
             key = f"{r['name']} ({r['email']})"
             member_stats.setdefault(key, {"present": 0, "absent": 0, "role": r["role"]})
             member_stats[key][r["status"]] += 1
@@ -148,6 +172,7 @@ def summary():
 @analytics_bp.route("/report", methods=["GET"])
 @login_required
 def download_report():
+    close_expired_sessions_and_mark_absent()
     role = request.role
     fmt  = request.args.get("format", "xlsx")
     args = request.args
@@ -155,9 +180,36 @@ def download_report():
 
     rows = [] if where == "1=0" else _fetch_attendance(where, params)
 
+    # Collapse multiple domain attendance records for the same user on the same date
+    collapsed = {}
+    for r in rows:
+        key = (r["email"], r["date"])
+        if key not in collapsed:
+            collapsed[key] = {
+                "name": r["name"],
+                "email": r["email"],
+                "role": r["role"],
+                "domain": r["domain"],
+                "date": r["date"],
+                "status": r["status"],
+                "marked_at": r["marked_at"],
+                "all_domains": [r["domain"]]
+            }
+        else:
+            collapsed[key]["all_domains"].append(r["domain"])
+            if r["status"] == "present":
+                collapsed[key]["status"] = "present"
+                collapsed[key]["marked_at"] = r["marked_at"] or collapsed[key]["marked_at"]
+
+    for c in collapsed.values():
+        c["domain"] = ", ".join(sorted(c["all_domains"]))
+        del c["all_domains"]
+
+    report_rows = list(collapsed.values())
+
     # Build dataframe — empty if no rows
-    if rows:
-        df = pd.DataFrame(rows)
+    if report_rows:
+        df = pd.DataFrame(report_rows)
         df["date"]      = df["date"].astype(str)
         df["marked_at"] = df["marked_at"].astype(str)
     else:
@@ -191,6 +243,7 @@ def download_report():
 @login_required
 def all_users_attendance():
     """Faculty and Admin: see attendance of ALL users of ALL roles."""
+    close_expired_sessions_and_mark_absent()
     if request.role not in ("admin", "faculty"):
         return jsonify({"error": "Access denied"}), 403
 
@@ -229,13 +282,26 @@ def all_users_attendance():
     for u in users:
         # Get attendance for this user
         att = execute_query(
-            f"""SELECT d.name as domain, a.date, a.status, a.marked_at
+            f"""SELECT MIN(a.id) as id,
+                       GROUP_CONCAT(d.name ORDER BY d.name SEPARATOR ', ') as domain,
+                       a.date,
+                       CASE WHEN SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) > 0 THEN 'present' ELSE 'absent' END as status,
+                       MAX(a.marked_at) as marked_at
                FROM attendance a
                JOIN domains d ON a.domain_id=d.id
                WHERE a.user_id=%s AND {where}
+               GROUP BY a.date
                ORDER BY a.date DESC""",
             (u["id"], *params), fetch=True
         )
+        
+        # Convert date and marked_at to strings since GROUP_CONCAT/aggregations might output datetime or bytearray objects
+        for r in att:
+            if r.get("date"):
+                r["date"] = str(r["date"])
+            if r.get("marked_at"):
+                r["marked_at"] = str(r["marked_at"])
+
         total = len(att)
         present = sum(1 for r in att if r["status"] == "present")
         result.append({

@@ -6,12 +6,22 @@ import RoleBadge from './RoleBadge'
 import { LogOut, User, Settings, ShieldCheck, Menu, X, Globe, Home, QrCode, BarChart2, Users } from 'lucide-react'
 import './Navbar.css'
 
+const isWithinWednesdayWindow = () => {
+  const now = new Date();
+  if (now.getDay() !== 3) return false;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const startMinutes = 12 * 60 + 40; // 12:40 PM
+  const endMinutes = 13 * 60 + 30;  // 1:30 PM (13:30)
+  return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+};
+
 export default function Navbar() {
   const { user, isAuthenticated, logout, hasRole } = useAuth()
   const navigate  = useNavigate()
   const location  = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeDomainName, setActiveDomainName] = useState(null)
+  const [bypassActive, setBypassActive] = useState(false)
 
   const dashboardMatch = location.pathname.match(/^\/domain\/(\d+)\/dashboard$/)
   const activeDomainId = dashboardMatch ? dashboardMatch[1] : null
@@ -25,6 +35,14 @@ export default function Navbar() {
       setActiveDomainName(null)
     }
   }, [activeDomainId])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      api.get("/attendance/scan-window-status")
+        .then(res => setBypassActive(res.data.bypass_active))
+        .catch(() => {});
+    }
+  }, [isAuthenticated]);
 
   if (location.pathname === '/verify-otp') return null
 
@@ -56,6 +74,7 @@ export default function Navbar() {
   const isActive = (path) => location.pathname.startsWith(path)
 
   const userRoles = user?.roles || (user?.role ? [user.role] : [])
+  const scanEnabled = isWithinWednesdayWindow() || bypassActive;
 
   return (
     <nav className="navbar">
@@ -79,7 +98,12 @@ export default function Navbar() {
               </Link>
             )}
             {!hasRole('faculty') && (
-              <Link to="/scan" className={`nav-link ${isActive('/scan') ? 'active' : ''}`}>
+              <Link 
+                to={scanEnabled ? "/scan" : "#"} 
+                className={`nav-link ${isActive('/scan') ? 'active' : ''} ${!scanEnabled ? 'disabled-link' : ''}`}
+                style={!scanEnabled ? { opacity: 0.5, pointerEvents: 'none', cursor: 'not-allowed' } : {}}
+                title={!scanEnabled ? "Scanning is only enabled on Wednesdays between 12:40 PM and 1:30 PM" : ""}
+              >
                 <QrCode size={16} /> Scan QR
               </Link>
             )}
@@ -151,7 +175,17 @@ export default function Navbar() {
         <div className="navbar-mobile-menu">
           <Link to="/dashboard" className="mobile-nav-link" onClick={() => setMenuOpen(false)}><Home size={16} /> Dashboard</Link>
           <Link to="/profile" className="mobile-nav-link" onClick={() => setMenuOpen(false)}><User size={16} /> Profile</Link>
-          {!hasRole('faculty') && <Link to="/scan" className="mobile-nav-link" onClick={() => setMenuOpen(false)}><QrCode size={16} /> Scan QR</Link>}
+          {!hasRole('faculty') && (
+            <Link 
+              to={scanEnabled ? "/scan" : "#"} 
+              className={`mobile-nav-link ${!scanEnabled ? 'disabled-link' : ''}`}
+              style={!scanEnabled ? { opacity: 0.5, pointerEvents: 'none', cursor: 'not-allowed' } : {}}
+              onClick={() => { if (scanEnabled) setMenuOpen(false); }}
+              title={!scanEnabled ? "Scanning is only enabled on Wednesdays between 12:40 PM and 1:30 PM" : ""}
+            >
+              <QrCode size={16} /> Scan QR
+            </Link>
+          )}
           {hasRole('admin', 'faculty') && <Link to="/admin" className="mobile-nav-link" onClick={() => setMenuOpen(false)}><ShieldCheck size={16} /> Admin</Link>}
           {hasRole('domain_lead') && !hasRole('admin') && user?.led_domains?.map(d => (
             <Link key={d.id} to={`/domain/${d.id}/dashboard`} className="mobile-nav-link" onClick={() => setMenuOpen(false)}>

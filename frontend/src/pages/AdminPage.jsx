@@ -6,7 +6,7 @@ import RoleBadge from '../components/RoleBadge'
 import LoadingSpinner from '../components/LoadingSpinner'
 import {
   Users, Globe, BarChart3, Search, ChevronLeft, ChevronRight,
-  ShieldCheck, UserX, Plus, Trash2, UserCheck, CheckCircle
+  ShieldCheck, UserX, Plus, Trash2, UserCheck, CheckCircle, Clock
 } from 'lucide-react'
 import './AdminPage.css'
 
@@ -34,6 +34,7 @@ export default function AdminPage() {
             { key: 'domain-requests', icon: <ShieldCheck size={16} />, label: 'Domain Requests' },
             { key: 'users',           icon: <Users size={16} />,       label: 'Users' },
             { key: 'domains',         icon: <Globe size={16} />,       label: 'Domains' },
+            { key: 'analytics',       icon: <Clock size={16} />,       label: 'Attendance Records' },
           ].map(t => (
             <button
               key={t.key}
@@ -51,6 +52,7 @@ export default function AdminPage() {
           {tab === 'domain-requests' && <DomainRequestsPanel />}
           {tab === 'users'           && <UsersPanel />}
           {tab === 'domains'         && <DomainsPanel />}
+          {tab === 'analytics'       && <DataAnalyticsPanel />}
         </div>
       </div>
     </div>
@@ -385,6 +387,18 @@ function DataAnalyticsPanel() {
     finally { setLoading(false) }
   }
 
+  const handleDeleteAttendance = async (attendanceId, userName, date) => {
+    if (!window.confirm(`Are you sure you want to remove attendance for ${userName} on ${date}?`)) return
+    try {
+      await api.delete(`/admin/attendance/${attendanceId}`)
+      alert('Attendance record removed successfully.')
+      const active = Object.fromEntries(Object.entries(filters).filter(([, v]) => v))
+      fetchData(active)
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to remove attendance.')
+    }
+  }
+
   useEffect(() => { fetchData() }, [])
 
   const applyFilters = () => {
@@ -498,13 +512,32 @@ function DataAnalyticsPanel() {
                     <tr key={`exp-${u.id}`}>
                       <td colSpan={10} style={{ padding: '0 16px 12px', background: '#0d1117' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}>
-                          <thead><tr>{['Date','Domain','Status','Marked At'].map(h => <th key={h} style={{ background: '#1e3a8a', color: '#93c5fd', padding: '6px 10px', fontSize: 11, textAlign: 'left' }}>{h}</th>)}</tr></thead>
+                          <thead><tr>{['Date','Domain','Status','Marked At', 'Action'].map(h => <th key={h} style={{ background: '#1e3a8a', color: '#93c5fd', padding: '6px 10px', fontSize: 11, textAlign: 'left' }}>{h}</th>)}</tr></thead>
                           <tbody>{u.records.map((r, j) => (
                             <tr key={j}>
                               <td style={{ padding: '6px 10px', fontSize: 13, color: '#d1d5db' }}>{r.date}</td>
                               <td style={{ padding: '6px 10px', fontSize: 13, color: '#d1d5db' }}>{r.domain}</td>
                               <td style={{ padding: '6px 10px', fontSize: 13, fontWeight: 700, color: r.status === 'present' ? '#2a9d8f' : '#e63946' }}>{r.status}</td>
                               <td style={{ padding: '6px 10px', fontSize: 13, color: '#6b7280' }}>{r.marked_at || '—'}</td>
+                              <td style={{ padding: '6px 10px', fontSize: 13 }}>
+                                {r.status === 'present' && (
+                                  <button
+                                    onClick={() => handleDeleteAttendance(r.id, u.name, r.date)}
+                                    style={{
+                                      background: '#e63946',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      padding: '4px 10px',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      fontSize: '11px',
+                                      fontWeight: '600'
+                                    }}
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </td>
                             </tr>
                           ))}</tbody>
                         </table>

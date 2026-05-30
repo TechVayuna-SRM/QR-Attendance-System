@@ -5,18 +5,102 @@ from db import execute_query
 from session_auth import login_required, role_required
 from face.utils import save_face_image, verify_face
 from qr.utils import generate_qr_token, generate_qr_image, get_expiry, is_within_session_window
+from config import Config
+from attendance.utils import close_expired_sessions_and_mark_absent
 
 attendance_bp = Blueprint("attendance", __name__)
+
+def send_qr_file(path):
+    response = send_file(path, mimetype="image/png")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 
 # ── QR Status ────────────────────────────────────────────────────
 @attendance_bp.route("/qr-status", methods=["GET"])
 @role_required("admin", "faculty")
 def qr_status():
+    close_expired_sessions_and_mark_absent()
     today = datetime.date.today()
+    now = datetime.datetime.now(timezone.utc).astimezone()
     existing = execute_query(
         "SELECT id FROM qr_sessions WHERE DATE(generated_at)=%s", (today,), fetch=True
     )
-    return jsonify({"generated_today": bool(existing)})
+    
+    # Check if there is currently an active session
+    active_sessions = execute_query(
+        "SELECT expires_at FROM qr_sessions WHERE is_active=TRUE AND expires_at > %s ORDER BY id DESC LIMIT 1",
+        (now,), fetch=True
+    )
+    
+    bypass = getattr(Config, "BYPASS_QR_RESTRICTIONS", False)
+    
+    res = {
+        "generated_today": bool(existing) if not bypass else False,
+        "bypass_active": bypass,
+        "has_active_session": False,
+        "seconds_remaining": 0
+    }
+    
+    if active_sessions:
+        expires_at = active_sessions[0]["expires_at"]
+        if isinstance(expires_at, datetime.datetime):
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=now.tzinfo)
+            delta = expires_at - now
+            seconds = int(delta.total_seconds())
+            if seconds > 0:
+                res["has_active_session"] = True
+                res["seconds_remaining"] = seconds
+                res["expires_at"] = expires_at.isoformat()
+                
+    response = jsonify(res)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+# ── Active QR Image Download ──────────────────────────────────────
+@attendance_bp.route("/active-qr-image", methods=["GET"])
+@role_required("admin", "faculty")
+def active_qr_image():
+    close_expired_sessions_and_mark_absent()
+    now = datetime.datetime.now(timezone.utc).astimezone()
+    rows = execute_query(
+        "SELECT token FROM qr_sessions WHERE is_active=TRUE AND expires_at > %s ORDER BY id DESC LIMIT 1",
+        (now,), fetch=True
+    )
+    if not rows:
+        return jsonify({"error": "No active session found"}), 404
+        
+    token = rows[0]["token"]
+    import os
+    from werkzeug.utils import secure_filename
+    filename = secure_filename(f"{token}.png")
+    qr_path = os.path.join(Config.QR_FOLDER, filename)
+    
+    if os.path.exists(qr_path):
+        return send_qr_file(qr_path)
+    else:
+        # Regenerate QR image if it was deleted
+        from qr.utils import generate_qr_image
+        try:
+            path = generate_qr_image(token)
+            return send_qr_file(path)
+        except Exception as e:
+            return jsonify({"error": f"Failed to regenerate QR image: {str(e)}"}), 500
+
+# ── Scan Window Status (Accessible by all logged-in users) ─────
+@attendance_bp.route("/scan-window-status", methods=["GET"])
+@login_required
+def scan_window_status():
+    bypass = getattr(Config, "BYPASS_QR_RESTRICTIONS", False)
+    return jsonify({
+        "is_within_window": is_within_session_window(),
+        "bypass_active": bypass
+    })
 
 # ── Face Registration (once only, not required for faculty) ────
 @attendance_bp.route("/register-face", methods=["POST"])
@@ -49,15 +133,19 @@ def register_face():
 @attendance_bp.route("/generate-qr", methods=["POST"])
 @role_required("admin", "faculty")
 def generate_qr():
+    close_expired_sessions_and_mark_absent()
     if not is_within_session_window():
         return jsonify({"error": "QR can only be generated on Wednesday 12:40–1:30 PM"}), 403
 
     today = datetime.date.today()
-    existing = execute_query(
-        "SELECT id FROM qr_sessions WHERE DATE(generated_at)=%s", (today,), fetch=True
-    )
-    if existing:
-        return jsonify({"error": "A QR code has already been generated for this Wednesday."}), 409
+
+    # Limit: One QR code per Wednesday session
+    if not getattr(Config, "BYPASS_QR_RESTRICTIONS", False):
+        existing = execute_query(
+            "SELECT id FROM qr_sessions WHERE DATE(generated_at)=%s", (today,), fetch=True
+        )
+        if existing:
+            return jsonify({"error": "A QR code has already been generated for today's session."}), 400
 
     token = generate_qr_token()
     expires_at = get_expiry()
@@ -89,12 +177,13 @@ def generate_qr():
             (request.user_id, d["domain_id"], session_id, today)
         )
 
-    return send_file(qr_path, mimetype="image/png")
+    return send_qr_file(qr_path)
 
 # ── QR Scan + Face Verify → Mark Present ────────────────────────
 @attendance_bp.route("/scan", methods=["POST"])
 @login_required
 def scan_qr():
+    close_expired_sessions_and_mark_absent()
     data = request.json
     token = data.get("token")
     face_image = data.get("image")
@@ -143,6 +232,15 @@ def scan_qr():
 
     today = datetime.date.today()
     now_utc = datetime.datetime.now(timezone.utc).astimezone()
+    
+    # 1. Update all existing attendance records for this user on this date to 'present'
+    execute_query(
+        """UPDATE attendance 
+           SET status='present', marked_at=%s, qr_session_id=%s
+           WHERE user_id=%s AND date=%s""",
+        (now_utc, session_row["id"], request.user_id, today)
+    )
+    # 2. Insert/update the specific domain_id just in case
     execute_query(
         """INSERT INTO attendance (user_id, domain_id, qr_session_id, status, marked_at, date)
            VALUES (%s, %s, %s, 'present', %s, %s)
@@ -155,6 +253,7 @@ def scan_qr():
 @attendance_bp.route("/mark-admin", methods=["POST"])
 @login_required
 def mark_admin_attendance():
+    close_expired_sessions_and_mark_absent()
     user_rows = execute_query(
         "SELECT role, face_registered FROM users WHERE id=%s", (request.user_id,), fetch=True
     )
@@ -187,6 +286,15 @@ def mark_admin_attendance():
 
     session_row = rows[0]
     today = datetime.date.today()
+    
+    # 1. Update all existing attendance records for this user on this date to 'present'
+    execute_query(
+        """UPDATE attendance 
+           SET status='present', marked_at=%s, qr_session_id=%s
+           WHERE user_id=%s AND date=%s""",
+        (now, session_row["id"], request.user_id, today)
+    )
+    # 2. Insert/update the specific domain_id just in case
     execute_query(
         """INSERT INTO attendance (user_id, domain_id, qr_session_id, status, marked_at, date)
            VALUES (%s, %s, %s, 'present', %s, %s)
@@ -199,10 +307,22 @@ def mark_admin_attendance():
 @attendance_bp.route("/my", methods=["GET"])
 @login_required
 def my_attendance():
+    close_expired_sessions_and_mark_absent()
     rows = execute_query(
-        """SELECT a.date, a.status, d.name as domain, a.marked_at
+        """SELECT a.date, 
+                  CASE WHEN SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) > 0 THEN 'present' ELSE 'absent' END as status,
+                  GROUP_CONCAT(d.name ORDER BY d.name SEPARATOR ', ') as domain,
+                  MAX(a.marked_at) as marked_at
            FROM attendance a JOIN domains d ON a.domain_id=d.id
-           WHERE a.user_id=%s ORDER BY a.date DESC""",
+           WHERE a.user_id=%s 
+           GROUP BY a.date 
+           ORDER BY a.date DESC""",
         (request.user_id,), fetch=True
     )
+    # Convert date and marked_at to strings since GROUP_CONCAT/aggregations might output bytearray or datetime objects
+    for r in rows:
+        if r.get("date"):
+            r["date"] = str(r["date"])
+        if r.get("marked_at"):
+            r["marked_at"] = str(r["marked_at"])
     return jsonify(rows)

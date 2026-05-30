@@ -11,6 +11,15 @@ const C = {
   accent: "#3b82f6",
 };
 
+const isWithinWednesdayWindow = () => {
+  const now = new Date();
+  if (now.getDay() !== 3) return false;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const startMinutes = 12 * 60 + 40; // 12:40 PM
+  const endMinutes = 13 * 60 + 30;  // 1:30 PM (13:30)
+  return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+};
+
 export default function QRScan() {
   const [userDomains, setUserDomains] = useState([]);
   const [allDomains,  setAllDomains]  = useState([]);
@@ -23,6 +32,8 @@ export default function QRScan() {
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [bypassActive, setBypassActive] = useState(false);
+  const [isWithinWindow, setIsWithinWindow] = useState(isWithinWednesdayWindow());
   const videoRef = useRef(null);
   const qrRef = useRef(null);
 
@@ -39,6 +50,14 @@ export default function QRScan() {
 
     // Fetch all domains for admin/faculty domain picker
     api.get("/analytics/domains").then(r => setAllDomains(r.data)).catch(() => {});
+
+    // Fetch active session window status
+    api.get("/attendance/scan-window-status")
+      .then(res => {
+        setBypassActive(res.data.bypass_active);
+        setIsWithinWindow(res.data.is_within_window);
+      })
+      .catch(() => {});
   }, []);
 
   const startScan = () => {
@@ -135,7 +154,8 @@ export default function QRScan() {
     );
   }
 
-  const canStartScan = role === "admin" || ((role === "member" || role === "domain_lead") && userDomains.length > 0);
+  const isWindowActive = isWithinWindow || bypassActive;
+  const canStartScan = isWindowActive && (role === "admin" || ((role === "member" || role === "domain_lead") && userDomains.length > 0));
 
   return (
     <div style={s.page}>
@@ -171,6 +191,12 @@ export default function QRScan() {
         )}
 
         <div style={s.divider} />
+
+        {!isWindowActive && (
+          <div style={{ ...s.warnBox, background: "#450a0a", border: "1px solid #ef444433", color: "#f87171", marginBottom: 20 }}>
+            ⚠️ Scanning is only active on Wednesdays between 12:40 PM and 1:30 PM.
+          </div>
+        )}
 
         {!scannedToken && (
           <div style={s.section}>

@@ -308,3 +308,37 @@ def get_stats():
         "role_distribution":  role_distribution,
         "top_domains":        top_domains,
     }), 200
+
+
+@admin_bp.route("/attendance/<int:attendance_id>", methods=["DELETE"])
+@role_required("admin", "faculty", "domain_lead")
+def delete_attendance(attendance_id):
+    rows = execute_query("SELECT user_id, date, domain_id FROM attendance WHERE id=%s", (attendance_id,), fetch=True)
+    if not rows:
+        return jsonify({"error": "Attendance record not found"}), 404
+
+    user_id = rows[0]["user_id"]
+    att_date = rows[0]["date"]
+
+    if request.role == "domain_lead":
+        # Check if this domain lead is assigned to the domain of the attendance record
+        lead_domain = execute_query(
+            "SELECT domain_id FROM domain_leads WHERE user_id=%s AND domain_id=%s",
+            (request.user_id, rows[0]["domain_id"]), fetch=True
+        )
+        if not lead_domain:
+            return jsonify({"error": "Forbidden: You are not the lead of this domain"}), 403
+
+        # Domain Leads only reset the record for the specific domain they manage
+        execute_query(
+            "UPDATE attendance SET status='absent', marked_at=NULL, qr_session_id=NULL WHERE id=%s",
+            (attendance_id,)
+        )
+    else:
+        # Admins and Faculty reset ALL attendance records for this user on this date
+        execute_query(
+            "UPDATE attendance SET status='absent', marked_at=NULL, qr_session_id=NULL WHERE user_id=%s AND date=%s",
+            (user_id, att_date)
+        )
+    return jsonify({"message": "Attendance record reset to absent successfully"}), 200
+

@@ -50,9 +50,10 @@ class Config:
     FACE_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "face_data")
     QR_FOLDER = os.path.join(os.path.dirname(__file__), "qr_codes")
 
-    QR_VALID_MINUTES = 10
+    QR_VALID_MINUTES = 40
     QR_SESSION_START_HOUR = 12
     QR_SESSION_START_MIN = 40
     QR_SESSION_END_HOUR = 13
     QR_SESSION_END_MIN = 30
     QR_SESSION_DAY = 2
+    BYPASS_QR_RESTRICTIONS = os.getenv("BYPASS_QR_RESTRICTIONS", "False") == "True"

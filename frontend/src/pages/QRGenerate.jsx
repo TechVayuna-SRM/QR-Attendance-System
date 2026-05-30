@@ -14,24 +14,69 @@ export default function QRGenerate() {
   const [qrUrl, setQrUrl] = useState(null);
   const [error, setError] = useState("");
   const [alreadyGenerated, setAlreadyGenerated] = useState(false);
+  const [bypassActive, setBypassActive] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [secondsRemaining, setSecondsRemaining] = useState(0);
 
   useEffect(() => {
     api.get("/attendance/qr-status")
-      .then(r => { if (r.data.generated_today) { setAlreadyGenerated(true); } })
+      .then(async (r) => {
+        if (r.data.generated_today) { setAlreadyGenerated(true); }
+        if (r.data.bypass_active) { setBypassActive(true); }
+        if (r.data.has_active_session && r.data.seconds_remaining > 0) {
+          setSecondsRemaining(r.data.seconds_remaining);
+          try {
+            const imgRes = await api.get("/attendance/active-qr-image", { responseType: "blob" });
+            setQrUrl(URL.createObjectURL(imgRes.data));
+          } catch (e) {
+            console.error("Failed to load active QR image:", e);
+          }
+        }
+      })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (secondsRemaining <= 0) return;
+    const timer = setInterval(() => {
+      setSecondsRemaining(prev => {
+        if (prev <= 1) {
+          api.get("/attendance/qr-status").then(r => {
+            setAlreadyGenerated(r.data.generated_today);
+            if (!r.data.has_active_session) {
+              setQrUrl(null);
+            }
+          }).catch(() => {});
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [secondsRemaining]);
 
   const generate = async () => {
     setError(""); setQrUrl(null); setLoading(true);
     try {
       const res = await api.post("/attendance/generate-qr", {}, { responseType: "blob" });
       setQrUrl(URL.createObjectURL(res.data));
-      setAlreadyGenerated(true);
+      if (!bypassActive) {
+        setAlreadyGenerated(true);
+      }
+      const statusRes = await api.get("/attendance/qr-status");
+      if (statusRes.data.has_active_session && statusRes.data.seconds_remaining > 0) {
+        setSecondsRemaining(statusRes.data.seconds_remaining);
+      }
     } catch (err) {
       const text = await err.response?.data?.text?.();
       try { setError(JSON.parse(text).error); } catch { setError("Failed to generate QR code."); }
     } finally { setLoading(false); }
+  };
+
+  const formatTime = (secs) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
 
   return (
@@ -45,6 +90,17 @@ export default function QRGenerate() {
             <p style={s.subtitle}>Session QR for attendance marking</p>
           </div>
         </div>
+
+        {/* Testing Mode Banner */}
+        {bypassActive && (
+          <div style={s.bypassBanner}>
+            <span style={s.bypassIcon}>🧪</span>
+            <div>
+              <p style={s.bypassTitle}>Testing Mode Active</p>
+              <p style={s.bypassSubtitle}>Session, expiration, and count limits are relaxed for testing.</p>
+            </div>
+          </div>
+        )}
 
         {/* Info Box */}
         <div style={s.infoBox}>
@@ -60,7 +116,7 @@ export default function QRGenerate() {
             <span style={s.infoIcon}>⏱️</span>
             <div>
               <p style={s.infoLabel}>QR Validity</p>
-              <p style={s.infoVal}>10 minutes per QR code</p>
+              <p style={s.infoVal}>40 minutes per QR code</p>
             </div>
           </div>
           <div style={s.infoDivider} />
@@ -102,11 +158,28 @@ export default function QRGenerate() {
             <div style={s.qrCard}>
               <p style={{ ...s.infoLabel, textAlign: "center", marginBottom: 16 }}>SCAN WITH CAMERA</p>
               <img src={qrUrl} alt="QR Code" style={s.qrImg} />
-              <div style={s.validPill}>✅ QR Active — Valid for 10 minutes</div>
+              <div style={s.validPill}>
+                {bypassActive ? "🧪 Active (Testing - 10m Expiry)" : "✅ QR Active"}
+              </div>
+              {secondsRemaining > 0 && (
+                <div style={s.timerPill}>
+                  ⏳ Expiring in: <span style={{ fontWeight: 800 }}>{formatTime(secondsRemaining)}</span>
+                </div>
+              )}
             </div>
-            <a href={qrUrl} download="qr_code.png" style={s.downloadBtn}>
-              ⬇ Download QR Code
-            </a>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 18 }}>
+              <a href={qrUrl} download="qr_code.png" style={s.downloadBtn}>
+                ⬇ Download QR Code
+              </a>
+              {bypassActive && (
+                <button
+                  style={{ ...s.btn, background: "linear-gradient(135deg,#10b981,#059669)" }}
+                  onClick={() => { setQrUrl(null); setSecondsRemaining(0); }}
+                >
+                  🔄 Generate Another QR Code
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -121,6 +194,10 @@ const s = {
   iconCircle:  { fontSize: 32, background: "#1f2937", width: 60, height: 60, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: `1px solid ${C.border}` },
   title:       { fontSize: 20, fontWeight: 800, color: C.textBright, margin: 0 },
   subtitle:    { fontSize: 13, color: C.text, margin: "4px 0 0" },
+  bypassBanner:{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, marginBottom: 20, textAlign: "left" },
+  bypassIcon:  { fontSize: 22, flexShrink: 0 },
+  bypassTitle: { fontSize: 13, fontWeight: 700, color: "#34d399", margin: 0 },
+  bypassSubtitle: { fontSize: 11, color: "#a7f3d0", margin: "2px 0 0", lineHeight: 1.4 },
   infoBox:     { background: "#0d1117", border: `1px solid ${C.border}`, borderRadius: 12, padding: "4px 0", marginBottom: 24 },
   infoRow:     { display: "flex", alignItems: "center", gap: 14, padding: "14px 18px" },
   infoIcon:    { fontSize: 22, flexShrink: 0 },
@@ -135,5 +212,6 @@ const s = {
   qrCard:      { background: "#fff", borderRadius: 16, padding: "24px", display: "inline-block", boxShadow: "0 0 0 4px #1f2937, 0 0 40px rgba(59,130,246,0.3)" },
   qrImg:       { width: 220, height: 220, display: "block" },
   validPill:   { background: "#14532d", color: "#4ade80", borderRadius: 20, padding: "6px 16px", fontSize: 12, fontWeight: 600, marginTop: 16, border: "1px solid #22c55e44" },
-  downloadBtn: { display: "inline-flex", alignItems: "center", gap: 8, marginTop: 18, background: "#1f2937", color: C.blue, border: "1px solid #1e3a8a", padding: "10px 24px", borderRadius: 10, fontWeight: 600, fontSize: 14, textDecoration: "none" },
+  timerPill:   { background: "rgba(59, 130, 246, 0.1)", color: "#60a5fa", borderRadius: 20, padding: "6px 16px", fontSize: 12, fontWeight: 600, marginTop: 12, border: "1px solid rgba(59, 130, 246, 0.2)", display: "inline-block" },
+  downloadBtn: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#1f2937", color: C.blue, border: "1px solid #1e3a8a", padding: "12px 24px", borderRadius: 10, fontWeight: 600, fontSize: 14, textDecoration: "none" },
 };

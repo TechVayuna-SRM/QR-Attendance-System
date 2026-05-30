@@ -11,7 +11,7 @@ const api = axios.create({
 
 // ── Response interceptor: handle 401 → try token refresh → retry ─────────────
 let isRefreshing = false;
-let failedQueue  = [];
+let failedQueue = [];
 
 function processQueue(error) {
   failedQueue.forEach(p => error ? p.reject(error) : p.resolve());
@@ -43,7 +43,7 @@ api.interceptors.response.use(
     }
 
     original._retry = true;
-    isRefreshing    = true;
+    isRefreshing = true;
 
     try {
       await api.post("/auth/refresh");

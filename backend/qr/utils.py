@@ -8,12 +8,19 @@ from config import Config
 os.makedirs(Config.QR_FOLDER, exist_ok=True)
 
 def is_within_session_window():
-    now = datetime.now(timezone.utc).astimezone()  # local time
+    if getattr(Config, "BYPASS_QR_RESTRICTIONS", False):
+        return True
+    
+    # System local time matches Config session parameters (e.g. Wednesday 12:40 - 13:30)
+    now = datetime.now()
     if now.weekday() != Config.QR_SESSION_DAY:
         return False
-    start = now.replace(hour=Config.QR_SESSION_START_HOUR, minute=Config.QR_SESSION_START_MIN, second=0, microsecond=0)
-    end = now.replace(hour=Config.QR_SESSION_END_HOUR, minute=Config.QR_SESSION_END_MIN, second=0, microsecond=0)
-    return start <= now <= end
+        
+    current_minutes = now.hour * 60 + now.minute
+    start_minutes = Config.QR_SESSION_START_HOUR * 60 + Config.QR_SESSION_START_MIN
+    end_minutes = Config.QR_SESSION_END_HOUR * 60 + Config.QR_SESSION_END_MIN
+    
+    return start_minutes <= current_minutes <= end_minutes
 
 def generate_qr_token():
     return str(uuid.uuid4())
@@ -29,4 +36,5 @@ def generate_qr_image(token):
     return path
 
 def get_expiry():
+    # QR code is valid for Config.QR_VALID_MINUTES (10 minutes)
     return datetime.now(timezone.utc).astimezone() + timedelta(minutes=Config.QR_VALID_MINUTES)

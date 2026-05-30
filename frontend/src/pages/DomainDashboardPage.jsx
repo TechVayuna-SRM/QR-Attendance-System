@@ -65,6 +65,17 @@ export default function DomainDashboardPage() {
     finally { setAttLoading(false) }
   }, [domainId, members])
 
+  const handleDeleteAttendance = async (attendanceId, userName, date) => {
+    if (!window.confirm(`Are you sure you want to remove attendance for ${userName} on ${date}?`)) return
+    try {
+      await api.delete(`/admin/attendance/${attendanceId}`)
+      alert('Attendance record removed successfully.')
+      fetchAttendance(attFilters)
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to remove attendance.')
+    }
+  }
+
   useEffect(() => { fetchData() }, [fetchData])
 
   useEffect(() => {
@@ -370,7 +381,7 @@ export default function DomainDashboardPage() {
                           <td colSpan={6} style={{ padding: '0 12px 12px', background: '#0d1117' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}>
                               <thead>
-                                <tr>{['Date', 'Status', 'Marked At'].map(h => <th key={h} style={{ padding: '6px 10px', background: '#1e3a8a', color: '#93c5fd', fontSize: 11, textAlign: 'left' }}>{h}</th>)}</tr>
+                                <tr>{['Date', 'Status', 'Marked At', hasRole('admin', 'faculty', 'domain_lead') ? 'Action' : ''].filter(Boolean).map(h => <th key={h} style={{ padding: '6px 10px', background: '#1e3a8a', color: '#93c5fd', fontSize: 11, textAlign: 'left' }}>{h}</th>)}</tr>
                               </thead>
                               <tbody>
                                 {u.records.map((r, j) => (
@@ -378,6 +389,27 @@ export default function DomainDashboardPage() {
                                     <td style={{ padding: '6px 10px', fontSize: 13, color: '#d1d5db' }}>{r.date}</td>
                                     <td style={{ padding: '6px 10px', fontSize: 13, fontWeight: 700, color: r.status === 'present' ? '#4ade80' : '#f87171' }}>{r.status}</td>
                                     <td style={{ padding: '6px 10px', fontSize: 13, color: '#6b7280' }}>{r.marked_at || '—'}</td>
+                                    {hasRole('admin', 'faculty', 'domain_lead') && (
+                                      <td style={{ padding: '6px 10px', fontSize: 13 }}>
+                                        {r.status === 'present' && (
+                                          <button
+                                            onClick={() => handleDeleteAttendance(r.id, u.name, r.date)}
+                                            style={{
+                                              background: '#ef4444',
+                                              color: '#ffffff',
+                                              border: 'none',
+                                              padding: '4px 10px',
+                                              borderRadius: '6px',
+                                              cursor: 'pointer',
+                                              fontSize: '11px',
+                                              fontWeight: '600'
+                                            }}
+                                          >
+                                            Remove
+                                          </button>
+                                        )}
+                                      </td>
+                                    )}
                                   </tr>
                                 ))}
                               </tbody>
