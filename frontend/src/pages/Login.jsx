@@ -41,7 +41,10 @@ export default function Login() {
   }
 
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:5001/api/auth/google'
+    const base = process.env.REACT_APP_API_URL
+      ? process.env.REACT_APP_API_URL
+      : `http://localhost:5001`
+    window.location.href = `${base}/api/auth/google`
   }
 
   return (
@@ -57,7 +60,7 @@ export default function Login() {
             <img src="/phoenix.png" alt="Logo" style={{ width: '80px', height: '80px', objectFit: 'contain', borderRadius: '12px' }} />
           </div>
           <h1 className="login-title">
-            Welcome to <span className="gradient-text">TechVayana</span>
+            Welcome to <span className="gradient-text">TechVayuna</span>
           </h1>
           <p className="login-subtitle">
             Secure attendance management with Google Sign-In

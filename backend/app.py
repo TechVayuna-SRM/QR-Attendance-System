@@ -22,12 +22,14 @@ def create_app():
     app.config["MAIL_PASSWORD"]       = Config.MAIL_PASSWORD
     app.config["MAIL_DEFAULT_SENDER"] = Config.MAIL_DEFAULT_SENDER
 
+    IS_PRODUCTION = os.getenv("RENDER", "false").lower() == "true"
+
     # ── JWT (HttpOnly cookies) ────────────────────────────────────────────────
     app.config["JWT_SECRET_KEY"]          = Config.JWT_SECRET_KEY
     app.config["JWT_TOKEN_LOCATION"]      = ["cookies"]
     app.config["JWT_COOKIE_HTTPONLY"]     = True
-    app.config["JWT_COOKIE_SECURE"]       = False
-    app.config["JWT_COOKIE_SAMESITE"]     = "Lax"
+    app.config["JWT_COOKIE_SECURE"]       = IS_PRODUCTION
+    app.config["JWT_COOKIE_SAMESITE"]     = "None" if IS_PRODUCTION else "Lax"
     app.config["JWT_COOKIE_CSRF_PROTECT"] = False
     app.config["JWT_ACCESS_TOKEN_EXPIRES"]  = Config.JWT_ACCESS_TOKEN_EXPIRES
     app.config["JWT_REFRESH_TOKEN_EXPIRES"] = Config.JWT_REFRESH_TOKEN_EXPIRES
@@ -52,8 +54,8 @@ def create_app():
     app.config["FRONTEND_URL"]         = Config.FRONTEND_URL
 
     # ── Session cookie ────────────────────────────────────────────────────────
-    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-    app.config["SESSION_COOKIE_SECURE"]   = False
+    app.config["SESSION_COOKIE_SAMESITE"] = "None" if IS_PRODUCTION else "Lax"
+    app.config["SESSION_COOKIE_SECURE"]   = IS_PRODUCTION
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_DOMAIN"]   = None
 
@@ -135,6 +137,7 @@ def create_app():
     return app
 
 
+app = create_app()
+
 if __name__ == "__main__":
-    app = create_app()
     app.run(debug=os.getenv("FLASK_DEBUG", "false").lower() == "true", port=5001)

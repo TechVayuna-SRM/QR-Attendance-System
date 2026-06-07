@@ -56,7 +56,7 @@ export default function Navbar() {
         <div className="navbar-inner">
           <Link to="/login" className="navbar-logo">
             <img src="/phoenix.png" alt="Logo" style={{ width: '36px', height: '36px', objectFit: 'contain', borderRadius: '8px' }} />
-            <span className="navbar-logo-text">Tech<span className="gradient-text">Vayana</span></span>
+            <span className="navbar-logo-text">Tech<span className="gradient-text">Vayuna</span></span>
           </Link>
           {isAuthenticated && (
             <div className="navbar-right">
@@ -81,7 +81,7 @@ export default function Navbar() {
       <div className="navbar-inner">
         <Link to={isAuthenticated ? '/dashboard' : '/login'} className="navbar-logo">
           <img src="/phoenix.png" alt="Logo" style={{ width: '36px', height: '36px', objectFit: 'contain', borderRadius: '8px' }} />
-          <span className="navbar-logo-text">Tech<span className="gradient-text">Vayana</span></span>
+          <span className="navbar-logo-text">Tech<span className="gradient-text">Vayuna</span></span>
         </Link>
 
         {isAuthenticated && (

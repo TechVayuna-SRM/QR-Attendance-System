@@ -50,6 +50,10 @@ class Config:
     FACE_UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "face_data")
     QR_FOLDER = os.path.join(os.path.dirname(__file__), "qr_codes")
 
+    CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+    CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "")
+    CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "")
+
     QR_VALID_MINUTES = 40
     QR_SESSION_START_HOUR = 12
     QR_SESSION_START_MIN = 40

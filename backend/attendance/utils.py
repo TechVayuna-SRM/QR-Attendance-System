@@ -1,6 +1,10 @@
 import datetime
 from datetime import timezone
 from db import execute_query
+from qr.utils import delete_qr_image
+import os
+from config import Config
+from werkzeug.utils import secure_filename
 
 def close_expired_sessions_and_mark_absent():
     """
@@ -12,7 +16,7 @@ def close_expired_sessions_and_mark_absent():
     
     # 1. Find all active sessions that have expired
     expired_sessions = execute_query(
-        "SELECT id, generated_at, generated_by FROM qr_sessions WHERE is_active=TRUE AND expires_at <= %s",
+        "SELECT id, generated_at, generated_by, token, cloudinary_public_id FROM qr_sessions WHERE is_active=TRUE AND expires_at <= %s",
         (now,), fetch=True
     ) or []
     
@@ -38,6 +42,15 @@ def close_expired_sessions_and_mark_absent():
             "UPDATE qr_sessions SET is_active=FALSE WHERE id=%s",
             (session_id,)
         )
+
+        # Delete QR image from Cloudinary (and local disk)
+        cloudinary_public_id = session.get("cloudinary_public_id")
+        token = session.get("token")
+        local_path = os.path.join(Config.QR_FOLDER, secure_filename(f"{token}.png")) if token else None
+        if cloudinary_public_id:
+            delete_qr_image(cloudinary_public_id, local_path)
+        elif local_path and os.path.exists(local_path):
+            os.remove(local_path)
         
         # Get all verified members and their domains
         members = execute_query(

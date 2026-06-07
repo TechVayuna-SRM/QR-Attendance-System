@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS qr_sessions (
     generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     expires_at DATETIME NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
+    cloudinary_public_id VARCHAR(300),
+    cloudinary_url VARCHAR(500),
     FOREIGN KEY (generated_by) REFERENCES users(id)
 );
 

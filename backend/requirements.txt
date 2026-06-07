@@ -14,7 +14,7 @@ python-dotenv
 requests
 qrcode[pil]
 deepface
-opencv-python
+opencv-python-headless
 pandas
 openpyxl
 reportlab
@@ -22,3 +22,5 @@ Pillow
 tf-keras
 bcrypt
 SQLAlchemy
+cloudinary
+gunicorn

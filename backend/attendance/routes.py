@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify, send_file
 from db import execute_query
 from session_auth import login_required, role_required
 from face.utils import save_face_image, verify_face
-from qr.utils import generate_qr_token, generate_qr_image, get_expiry, is_within_session_window
+from qr.utils import generate_qr_token, generate_qr_image, get_expiry, is_within_session_window, delete_qr_image
 from config import Config
 from attendance.utils import close_expired_sessions_and_mark_absent
 
@@ -69,28 +69,25 @@ def active_qr_image():
     close_expired_sessions_and_mark_absent()
     now = datetime.datetime.now(timezone.utc).astimezone()
     rows = execute_query(
-        "SELECT token FROM qr_sessions WHERE is_active=TRUE AND expires_at > %s ORDER BY id DESC LIMIT 1",
+        "SELECT token, cloudinary_url FROM qr_sessions WHERE is_active=TRUE AND expires_at > %s ORDER BY id DESC LIMIT 1",
         (now,), fetch=True
     )
     if not rows:
         return jsonify({"error": "No active session found"}), 404
-        
-    token = rows[0]["token"]
+
+    cloudinary_url = rows[0].get("cloudinary_url")
+    if cloudinary_url:
+        return jsonify({"url": cloudinary_url})
+
+    # Fallback: serve local file
     import os
     from werkzeug.utils import secure_filename
+    token = rows[0]["token"]
     filename = secure_filename(f"{token}.png")
     qr_path = os.path.join(Config.QR_FOLDER, filename)
-    
     if os.path.exists(qr_path):
         return send_qr_file(qr_path)
-    else:
-        # Regenerate QR image if it was deleted
-        from qr.utils import generate_qr_image
-        try:
-            path = generate_qr_image(token)
-            return send_qr_file(path)
-        except Exception as e:
-            return jsonify({"error": f"Failed to regenerate QR image: {str(e)}"}), 500
+    return jsonify({"error": "QR image not found"}), 404
 
 # ── Scan Window Status (Accessible by all logged-in users) ─────
 @attendance_bp.route("/scan-window-status", methods=["GET"])
@@ -149,11 +146,11 @@ def generate_qr():
 
     token = generate_qr_token()
     expires_at = get_expiry()
+    qr_path, cloudinary_public_id, cloudinary_url = generate_qr_image(token)
     session_id = execute_query(
-        "INSERT INTO qr_sessions (token, generated_by, expires_at) VALUES (%s, %s, %s)",
-        (token, request.user_id, expires_at)
+        "INSERT INTO qr_sessions (token, generated_by, expires_at, cloudinary_public_id, cloudinary_url) VALUES (%s, %s, %s, %s, %s)",
+        (token, request.user_id, expires_at, cloudinary_public_id, cloudinary_url)
     )
-    qr_path = generate_qr_image(token)
 
     # Insert absent rows for all verified members
     members = execute_query(
@@ -177,7 +174,7 @@ def generate_qr():
             (request.user_id, d["domain_id"], session_id, today)
         )
 
-    return send_qr_file(qr_path)
+    return jsonify({"url": cloudinary_url})
 
 # ── QR Scan + Face Verify → Mark Present ────────────────────────
 @attendance_bp.route("/scan", methods=["POST"])
