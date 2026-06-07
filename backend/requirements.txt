@@ -23,4 +23,5 @@ SQLAlchemy
 cloudinary
 gunicorn
 tensorflow==2.16.1
+tf-keras
 deepface==0.0.93
