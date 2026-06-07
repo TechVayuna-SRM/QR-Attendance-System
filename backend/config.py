@@ -20,6 +20,7 @@ class Config:
     SECRET_KEY = os.getenv("FLASK_SECRET", "fallback-secret")
 
     DB_HOST = os.getenv("DB_HOST", "localhost")
+    DB_PORT = int(os.getenv("DB_PORT", 3306))
     DB_USER = os.getenv("DB_USER", "root")
     DB_PASSWORD = os.getenv("DB_PASSWORD", "!@#$")
     DB_NAME = os.getenv("DB_NAME", "TV_DA_QR_BASED_ATTENDANCE_SYSTEM_FULL_PROJECT_DATABASE")

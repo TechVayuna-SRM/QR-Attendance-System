@@ -37,7 +37,7 @@ def create_app():
     # ── SQLAlchemy ────────────────────────────────────────────────────────────
     app.config["SQLALCHEMY_DATABASE_URI"] = (
         f"mysql+pymysql://{Config.DB_USER}:{Config.DB_PASSWORD}"
-        f"@{Config.DB_HOST}/{Config.DB_NAME}"
+        f"@{Config.DB_HOST}:{Config.DB_PORT}/{Config.DB_NAME}"
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
