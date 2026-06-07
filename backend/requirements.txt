@@ -13,14 +13,14 @@ cryptography
 python-dotenv
 requests
 qrcode[pil]
-deepface
 opencv-python-headless
 pandas
 openpyxl
 reportlab
 Pillow
-tf-keras
 bcrypt
 SQLAlchemy
 cloudinary
 gunicorn
+tensorflow==2.16.1
+deepface==0.0.93
