@@ -126,6 +126,10 @@ def create_app():
     app.register_blueprint(domain_dashboard_bp)
 
     # ── Health check ──────────────────────────────────────────────────────────
+@app.route("/")
+    def index():
+        return jsonify({"status": "ok", "service": "QR Attendance API"}), 200
+
     @app.route("/api/health")
     def health():
         return jsonify({"status": "ok", "service": "QR Attendance API"}), 200
