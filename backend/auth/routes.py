@@ -351,14 +351,23 @@ def verify_email_otp():
 @jwt_required()
 def resend_otp():
     user_id = get_jwt_identity()
-    rows    = execute_query("SELECT email, name FROM users WHERE id=%s", (user_id,), fetch=True)
+    try:
+        rows = execute_query("SELECT email, name FROM users WHERE id=%s", (user_id,), fetch=True)
+    except Exception as e:
+        current_app.logger.error("resend_otp DB error: %s", e)
+        return jsonify({"error": "Database error. Please try again."}), 500
     if not rows:
         return jsonify({"error": "User not found"}), 404
     user = rows[0]
-    otp  = _generate_otp(user_id)
+    try:
+        otp = _generate_otp(user_id)
+    except Exception as e:
+        current_app.logger.error("resend_otp generate OTP error: %s", e)
+        return jsonify({"error": "Database error. Please try again."}), 500
     try:
         _send_otp_mail(user["email"], user["name"], otp)
-    except Exception:
+    except Exception as e:
+        current_app.logger.error("resend_otp email error: %s", e)
         return jsonify({"error": "Failed to send email. Please try again later."}), 500
     return jsonify({"message": f"OTP sent to {user['email']}"}), 200
 
