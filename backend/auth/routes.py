@@ -135,52 +135,18 @@ def _user_to_dict(user):
 
 @auth_bp.route("/google")
 def google_login():
-    import secrets
-    state = secrets.token_urlsafe(16)
-    session['oauth_state'] = state
-    session.modified = True
-    from urllib.parse import urlencode
-    params = {
-        'client_id':     Config.GOOGLE_CLIENT_ID,
-        'redirect_uri':  Config.OAUTH_REDIRECT_URI,
-        'response_type': 'code',
-        'scope':         'openid email profile',
-        'state':         state,
-        'prompt':        'select_account',
-    }
-    return redirect('https://accounts.google.com/o/oauth2/v2/auth?' + urlencode(params))
+    return oauth.google.authorize_redirect(
+        Config.OAUTH_REDIRECT_URI,
+        prompt="select_account"
+    )
 
 
 @auth_bp.route("/google/callback")
 def google_callback():
-    import requests as http_req
     frontend_url = Config.FRONTEND_URL
     try:
-        code = request.args.get('code')
-        if not code:
-            raise ValueError('No code in callback')
-
-        token_resp = http_req.post('https://oauth2.googleapis.com/token', data={
-            'code':          code,
-            'client_id':     Config.GOOGLE_CLIENT_ID,
-            'client_secret': Config.GOOGLE_CLIENT_SECRET,
-            'redirect_uri':  Config.OAUTH_REDIRECT_URI,
-            'grant_type':    'authorization_code',
-        })
-        token_data = token_resp.json()
-        if 'error' in token_data:
-            error_desc = token_data.get('error_description', '')
-            current_app.logger.error(
-                "Google token exchange failed. Error: %s, Description: %s, Redirect URI used: %s", 
-                token_data['error'], error_desc, Config.OAUTH_REDIRECT_URI
-            )
-            raise ValueError(f"{token_data['error']}: {error_desc}")
-
-        userinfo_resp = http_req.get(
-            'https://www.googleapis.com/oauth2/v3/userinfo',
-            headers={'Authorization': f'Bearer {token_data["access_token"]}'}
-        )
-        user_info  = userinfo_resp.json()
+        token_data = oauth.google.authorize_access_token()
+        user_info  = token_data.get("userinfo") or oauth.google.userinfo()
         google_id  = user_info['sub']
         email      = user_info['email']
         name       = user_info.get('name') or email.split('@')[0]
