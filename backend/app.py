@@ -1,4 +1,8 @@
 import os
+# Silence TensorFlow verbose logs (GPU/CPU warnings)
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_mail import Mail
