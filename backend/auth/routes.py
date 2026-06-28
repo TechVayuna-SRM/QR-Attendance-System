@@ -169,7 +169,12 @@ def google_callback():
         })
         token_data = token_resp.json()
         if 'error' in token_data:
-            raise ValueError(token_data['error'])
+            error_desc = token_data.get('error_description', '')
+            current_app.logger.error(
+                "Google token exchange failed. Error: %s, Description: %s, Redirect URI used: %s", 
+                token_data['error'], error_desc, Config.OAUTH_REDIRECT_URI
+            )
+            raise ValueError(f"{token_data['error']}: {error_desc}")
 
         userinfo_resp = http_req.get(
             'https://www.googleapis.com/oauth2/v3/userinfo',
