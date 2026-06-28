@@ -5,7 +5,7 @@ import bcrypt
 from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, request, jsonify, session, current_app, redirect, make_response
-from flask_mail import Mail, Message
+from flask_mail import Message
 from flask_jwt_extended import (
     create_access_token, create_refresh_token,
     get_jwt, get_jwt_identity, jwt_required,
@@ -56,7 +56,7 @@ def _verify_otp_value(user_id, otp_text):
 
 
 def _send_otp_mail(email, name, otp):
-    mail_obj = Mail(current_app._get_current_object())
+    from app import mail as mail_obj
     digits_html = f"<div style='font-size:28px;letter-spacing:2px;font-weight:bold;'>{' '.join(otp)}</div>"
     html_body = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
