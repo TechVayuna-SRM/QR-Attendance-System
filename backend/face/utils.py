@@ -7,7 +7,6 @@ import requests
 import cloudinary
 import cloudinary.uploader
 from io import BytesIO
-from deepface import DeepFace
 from config import Config
 
 cloudinary.config(
@@ -18,6 +17,7 @@ cloudinary.config(
 
 def save_face_image(user_id, b64_image):
     """Decode base64 image, validate face present, upload to Cloudinary."""
+    from deepface import DeepFace
     img_data = base64.b64decode(b64_image.split(",")[-1])
     np_arr = np.frombuffer(img_data, np.uint8)
     img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
@@ -51,6 +51,7 @@ def _fetch_face_from_cloudinary(user_id):
 
 def verify_face(user_id, b64_image):
     """Compare live capture against registered face from Cloudinary. Returns True/False."""
+    from deepface import DeepFace
     registered_img = _fetch_face_from_cloudinary(user_id)
 
     img_data = base64.b64decode(b64_image.split(",")[-1])
