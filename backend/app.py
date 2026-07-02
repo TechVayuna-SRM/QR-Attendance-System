@@ -66,10 +66,11 @@ def create_app():
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "pool_recycle": 300,
+        "pool_recycle": 60,
         "pool_pre_ping": True,
-        "pool_size": 10,
-        "max_overflow": 20,
+        "pool_size": 2,
+        "max_overflow": 3,
+        "connect_args": {"connect_timeout": 10},
     }
 
     # ── Google OAuth ──────────────────────────────────────────────────────────
