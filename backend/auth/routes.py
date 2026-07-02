@@ -57,77 +57,33 @@ def _verify_otp_value(user_id, otp_text):
 
 
 def _send_otp_mail(email, name, otp):
-<<<<<<< HEAD
     from app import mail as mail_obj
-    digits_html = f"<div style='font-size:28px;letter-spacing:2px;font-weight:bold;'>{' '.join(otp)}</div>"
-    html_body = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
+    from flask_mail import Message
+    digits = " ".join(otp)
+    html_body = f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#07070f;font-family:'Segoe UI',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#07070f,#0f0f1a);min-height:100vh;">
-    <tr><td align="center" style="padding:48px 16px;">
-      <table width="520" cellpadding="0" cellspacing="0"
-             style="background:rgba(255,255,255,0.05);border-radius:20px;border:1px solid rgba(139,92,246,0.25);">
-        <tr><td style="padding:40px 40px 0;text-align:center;">
-          <h1 style="margin:0;font-size:22px;color:#f1f5f9;">QR Attendance System</h1>
-          <p style="color:#8b5cf6;font-size:14px;">EMAIL VERIFICATION</p>
-        </td></tr>
-        <tr><td style="padding:32px 40px;">
-          <p style="color:#94a3b8;font-size:16px;">Hi <strong style="color:#e9d5ff;">{html.escape(name)}</strong>,</p>
-          <p style="color:#94a3b8;font-size:16px;">Use the one-time passcode below to verify your email.</p>
-          <div style="text-align:center;padding:28px 20px;background:rgba(139,92,246,0.08);border-radius:14px;border:1px solid rgba(139,92,246,0.2);margin-bottom:24px;">
-            {digits_html}
-            <p style="margin:16px 0 0;color:#64748b;font-size:13px;">⏱ Valid for <strong style="color:#a78bfa;">5 minutes</strong></p>
-          </div>
-        </td></tr>
-        <tr><td style="padding:0 40px 36px;border-top:1px solid rgba(255,255,255,0.06);">
-          <p style="color:#475569;font-size:12px;text-align:center;margin:24px 0 0;">QR Attendance System &bull; Automated message, do not reply</p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>"""
-    msg = Message(subject="🔐 Verify Your Email — QR Attendance", recipients=[email], html=html_body)
+<table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#07070f,#0f0f1a);min-height:100vh;">
+<tr><td align="center" style="padding:48px 16px;">
+<table width="520" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.05);border-radius:20px;border:1px solid rgba(139,92,246,0.25);">
+<tr><td style="padding:40px 40px 0;text-align:center;">
+<h1 style="margin:0;font-size:22px;color:#f1f5f9;">QR Attendance System</h1>
+<p style="color:#8b5cf6;font-size:14px;">EMAIL VERIFICATION</p>
+</td></tr>
+<tr><td style="padding:32px 40px;">
+<p style="color:#94a3b8;font-size:16px;">Hi <strong style="color:#e9d5ff;">{html.escape(name)}</strong>,</p>
+<p style="color:#94a3b8;font-size:16px;">Use the one-time passcode below to verify your email.</p>
+<div style="text-align:center;padding:28px 20px;background:rgba(139,92,246,0.08);border-radius:14px;border:1px solid rgba(139,92,246,0.2);margin-bottom:24px;">
+<div style="font-size:28px;letter-spacing:2px;font-weight:bold;">{digits}</div>
+<p style="margin:16px 0 0;color:#64748b;font-size:13px;">Valid for <strong style="color:#a78bfa;">5 minutes</strong></p>
+</div>
+</td></tr>
+<tr><td style="padding:0 40px 36px;border-top:1px solid rgba(255,255,255,0.06);">
+<p style="color:#475569;font-size:12px;text-align:center;margin:24px 0 0;">QR Attendance System &bull; Automated message, do not reply</p>
+</td></tr>
+</table></td></tr></table></body></html>"""
+    msg = Message(subject="Verify Your Email - QR Attendance", recipients=[email], html=html_body)
     mail_obj.send(msg)
-=======
-    import os
-    from sendgrid import SendGridAPIClient
-    from sendgrid.helpers.mail import Mail as SGMail
-    digits_html = "<div style='font-size:28px;letter-spacing:2px;font-weight:bold;'>" + " ".join(otp) + "</div>"
-    html_body = (
-        '<!DOCTYPE html><html><head><meta charset="utf-8"></head>'
-        '<body style="margin:0;padding:0;background:#07070f;font-family:\'Segoe UI\',Arial,sans-serif;">'
-        '<table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(135deg,#07070f,#0f0f1a);min-height:100vh;">'
-        '<tr><td align="center" style="padding:48px 16px;">'
-        '<table width="520" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.05);border-radius:20px;border:1px solid rgba(139,92,246,0.25);">'
-        '<tr><td style="padding:40px 40px 0;text-align:center;">'
-        '<h1 style="margin:0;font-size:22px;color:#f1f5f9;">QR Attendance System</h1>'
-        '<p style="color:#8b5cf6;font-size:14px;">EMAIL VERIFICATION</p>'
-        '</td></tr><tr><td style="padding:32px 40px;">'
-        '<p style="color:#94a3b8;font-size:16px;">Hi <strong style="color:#e9d5ff;">' + html.escape(name) + '</strong>,</p>'
-        '<p style="color:#94a3b8;font-size:16px;">Use the one-time passcode below to verify your email.</p>'
-        '<div style="text-align:center;padding:28px 20px;background:rgba(139,92,246,0.08);border-radius:14px;border:1px solid rgba(139,92,246,0.2);margin-bottom:24px;">'
-        + digits_html +
-        '<p style="margin:16px 0 0;color:#64748b;font-size:13px;">&#9203; Valid for <strong style="color:#a78bfa;">5 minutes</strong></p>'
-        '</div></td></tr>'
-        '<tr><td style="padding:0 40px 36px;border-top:1px solid rgba(255,255,255,0.06);">'
-        '<p style="color:#475569;font-size:12px;text-align:center;margin:24px 0 0;">QR Attendance System &bull; Automated message, do not reply</p>'
-        '</td></tr></table></td></tr></table></body></html>'
-    )
-    sg_api_key = os.getenv("SENDGRID_API_KEY")
-    if not sg_api_key:
-        raise RuntimeError("SENDGRID_API_KEY is not set")
-    sender = os.getenv("MAIL_DEFAULT_SENDER", "s.satvika2005@gmail.com")
-    message = SGMail(
-        from_email=sender,
-        to_emails=email,
-        subject="Verify Your Email - QR Attendance",
-        html_content=html_body
-    )
-    sg = SendGridAPIClient(sg_api_key)
-    response = sg.send(message)
-    if response.status_code not in (200, 202):
-        raise RuntimeError("SendGrid error: " + str(response.status_code))
->>>>>>> 0ce19fc (Updated QR Attendance System)
+
 
 
 # ── JWT helpers ───────────────────────────────────────────────────────────────
