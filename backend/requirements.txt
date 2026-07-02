@@ -1,6 +1,7 @@
 flask
 flask-cors
 flask-mail
+sendgrid
 flask-sqlalchemy
 flask-migrate
 flask-jwt-extended
