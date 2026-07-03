@@ -26,26 +26,15 @@ os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 from flask import Flask, jsonify
 from flask_cors import CORS
-from flask_mail import Mail
 from flask_jwt_extended import JWTManager
 from config import Config
 
-# Legacy mail/jwt instances (used by auth/routes.py directly)
-mail = Mail()
-jwt  = JWTManager()
+jwt = JWTManager()
 
 
 def create_app():
     app = Flask(__name__)
     app.secret_key = Config.SECRET_KEY
-
-    # ── Mail ──────────────────────────────────────────────────────────────────
-    app.config["MAIL_SERVER"]         = Config.MAIL_SERVER
-    app.config["MAIL_PORT"]           = Config.MAIL_PORT
-    app.config["MAIL_USE_TLS"]        = Config.MAIL_USE_TLS
-    app.config["MAIL_USERNAME"]       = Config.MAIL_USERNAME
-    app.config["MAIL_PASSWORD"]       = Config.MAIL_PASSWORD
-    app.config["MAIL_DEFAULT_SENDER"] = Config.MAIL_DEFAULT_SENDER
 
     IS_PRODUCTION = os.getenv("RENDER", "false").lower() == "true"
 
@@ -95,7 +84,6 @@ def create_app():
     }}, always_send=True)
 
     # ── Extensions ────────────────────────────────────────────────────────────
-    mail.init_app(app)
     jwt.init_app(app)
 
     # SQLAlchemy + Migrate (new)
