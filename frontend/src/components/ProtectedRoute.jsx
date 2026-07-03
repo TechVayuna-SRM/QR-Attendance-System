@@ -18,7 +18,7 @@ export default function ProtectedRoute({
 
   // New user — redirect to onboarding (except if already on /onboarding)
   // Faculty bypass onboarding entirely
-  if (requireOnboarded && isAuthenticated && user?.role !== 'faculty') {
+  if (requireOnboarded && isAuthenticated && user?.role !== 'faculty' && user?.role !== 'admin') {
     if (!isOnboarded || !isApproved) {
       if (location.pathname !== '/onboarding') {
         return <Navigate to="/onboarding" replace />
