@@ -57,8 +57,9 @@ def _verify_otp_value(user_id, otp_text):
 
 
 def _send_otp_mail(email, name, otp):
-    from app import mail as mail_obj
-    from flask_mail import Message
+    import os
+    import sib_api_v3_sdk
+    from sib_api_v3_sdk.rest import ApiException
     digits = " ".join(otp)
     html_body = f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#07070f;font-family:'Segoe UI',Arial,sans-serif;">
@@ -81,8 +82,20 @@ def _send_otp_mail(email, name, otp):
 <p style="color:#475569;font-size:12px;text-align:center;margin:24px 0 0;">QR Attendance System &bull; Automated message, do not reply</p>
 </td></tr>
 </table></td></tr></table></body></html>"""
-    msg = Message(subject="Verify Your Email - QR Attendance", recipients=[email], html=html_body)
-    mail_obj.send(msg)
+    api_key = os.getenv("BREVO_API_KEY")
+    if not api_key:
+        raise RuntimeError("BREVO_API_KEY is not set")
+    configuration = sib_api_v3_sdk.Configuration()
+    configuration.api_key["api-key"] = api_key
+    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
+    sender = {"name": "QR Attendance System", "email": os.getenv("MAIL_DEFAULT_SENDER", "techvayuna2k19@gmail.com")}
+    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+        to=[{"email": email, "name": name}],
+        sender=sender,
+        subject="Verify Your Email - QR Attendance",
+        html_content=html_body
+    )
+    api_instance.send_transac_email(send_smtp_email)
 
 
 
