@@ -183,14 +183,8 @@ def google_callback():
             )
             user = execute_query("SELECT * FROM users WHERE id=%s", (user_id,), fetch=True)[0]
 
-        otp = _generate_otp(user["id"])
-        try:
-            _send_otp_mail(user["email"], user["name"], otp)
-        except Exception as e:
-            current_app.logger.warning("Email send failed for %s: %s", user["email"], e)
-
-        redirect_url = f"{frontend_url}/auth/callback?status=pending_verification"
-        return _set_cookie_response(user, otp_verified=False, redirect_url=redirect_url)
+        redirect_url = f"{frontend_url}/auth/callback?status=success"
+        return _set_cookie_response(user, otp_verified=True, redirect_url=redirect_url)
 
     except Exception as exc:
         current_app.logger.error("Google callback error: %s", exc)
