@@ -171,7 +171,7 @@ def google_callback():
             user = rows[0]
             if not user["google_id"]:
                 execute_query("UPDATE users SET google_id=%s WHERE id=%s", (google_id, user["id"]))
-            if is_admin_email and user["role"] != "admin":
+            if is_admin_email:
                 execute_query("UPDATE users SET role='admin', is_approved=TRUE, is_verified=TRUE WHERE id=%s", (user["id"],))
             user = execute_query("SELECT * FROM users WHERE id=%s", (user["id"],), fetch=True)[0]
         else:
