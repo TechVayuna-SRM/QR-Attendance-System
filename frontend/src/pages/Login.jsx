@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import api from '../api/axios'
 import './LoginPage.css'
 
 export default function Login() {
-  const { isAuthenticated, isVerified, saveTokens } = useAuth()
+  const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
 
-  const [registrationNumber, setRegistrationNumber] = useState('')
   const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -19,26 +16,8 @@ export default function Login() {
   }, [])
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate(isVerified ? '/dashboard' : '/verify-otp', { replace: true })
-    }
-  }, [isAuthenticated, isVerified, navigate])
-
-  const handleRegNoLogin = async (e) => {
-    e.preventDefault()
-    if (!registrationNumber.trim()) { setError('Please enter your registration number'); return }
-    try {
-      setIsLoading(true)
-      setError('')
-      const res = await api.post('/auth/request-otp', { registration_number: registrationNumber })
-      saveTokens(res.data.access_token, res.data.refresh_token)
-      navigate('/verify-otp')
-    } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Please try again.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    if (isAuthenticated) navigate('/dashboard', { replace: true })
+  }, [isAuthenticated, navigate])
 
   const handleGoogleLogin = () => {
     const base = process.env.REACT_APP_API_URL
@@ -63,30 +42,11 @@ export default function Login() {
             Welcome to <span className="gradient-text">TechVayuna</span>
           </h1>
           <p className="login-subtitle">
-            Secure attendance management with Google Sign-In
+            Sign in with your Google account to continue.
           </p>
         </div>
 
-        {/* Existing User Login */}
-        <form style={{ display: 'flex', flexDirection: 'column', gap: '12px' }} onSubmit={handleRegNoLogin}>
-          {error && <div className="alert alert-error">⚠️ {error}</div>}
-          <div className="input-group">
-            <label className="input-label">Registration Number</label>
-            <input
-              type="text"
-              className="input-field"
-              placeholder="e.g. RAXXXXXXXXXXXXX"
-              value={registrationNumber}
-              onChange={e => setRegistrationNumber(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
-          <button type="submit" className="btn btn-primary btn-full" disabled={isLoading}>
-            {isLoading ? <><span className="spin">⟳</span> Sending…</> : 'Send OTP'}
-          </button>
-        </form>
-
-        <div className="divider">new user?</div>
+        {error && <div className="alert alert-error">⚠️ {error}</div>}
 
         {/* Google Sign-In */}
         <button className="btn btn-google btn-full" onClick={handleGoogleLogin}>
@@ -96,12 +56,11 @@ export default function Login() {
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
           </svg>
-          Sign up with Google
+          Sign in with Google
         </button>
 
         <p className="login-terms">
           By signing in, you agree to our <a href="#terms">Terms of Service</a> and <a href="#privacy">Privacy Policy</a>.
-          Your email will be verified via OTP after sign-in.
         </p>
       </div>
 
